@@ -108,7 +108,7 @@ const TontineDetail = () => {
           status,
           joined_at,
           user_id,
-          profiles:profiles!user_id(id, full_name, email, avatar_url)
+          profiles:user_id(id, full_name, email, avatar_url)
         `)
         .eq('group_id', id);
         
@@ -124,7 +124,7 @@ const TontineDetail = () => {
           cycle_month,
           status,
           recipient_id,
-          recipient:profiles!recipient_id(id, full_name, email, avatar_url)
+          recipient:recipient_id(id, full_name, email, avatar_url)
         `)
         .eq('group_id', id)
         .order('cycle_month', { ascending: true });
@@ -156,10 +156,34 @@ const TontineDetail = () => {
         throw userRoleError;
       }
       
+      const processedMembers = members?.map(member => {
+        return {
+          ...member,
+          profiles: {
+            id: member.profiles?.id || "",
+            full_name: member.profiles?.full_name || null,
+            email: member.profiles?.email || "",
+            avatar_url: member.profiles?.avatar_url || null
+          }
+        } as Member;
+      }) || [];
+      
+      const processedCycles = cycles?.map(cycle => {
+        return {
+          ...cycle,
+          recipient: cycle.recipient_id ? {
+            id: cycle.recipient?.id || "",
+            full_name: cycle.recipient?.full_name || null,
+            email: cycle.recipient?.email || "",
+            avatar_url: cycle.recipient?.avatar_url || null
+          } : null
+        } as PaymentCycle;
+      }) || [];
+      
       return {
         ...tontine,
-        members: members || [],
-        cycles: cycles || [],
+        members: processedMembers,
+        cycles: processedCycles,
         invitations: invitations || [],
         userRole: userRole?.role || (tontine.admin_id === user.id ? 'admin' : null),
         isAdmin: tontine.admin_id === user.id || userRole?.role === 'admin'
