@@ -1,4 +1,3 @@
-
 import { useParams, useNavigate, Navigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { ChevronLeft, Users, Calendar, DollarSign, Clock, Mail, Phone } from "lucide-react";
@@ -25,6 +24,56 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 
+interface Profile {
+  id: string;
+  full_name: string | null;
+  email: string;
+  avatar_url: string | null;
+}
+
+interface Member {
+  id: string;
+  role: string;
+  status: string;
+  joined_at: string | null;
+  user_id: string;
+  profiles: Profile;
+}
+
+interface PaymentCycle {
+  id: string;
+  cycle_month: string;
+  status: string;
+  recipient_id: string | null;
+  recipient: Profile | null;
+}
+
+interface Invitation {
+  id: string;
+  email: string | null;
+  phone: string | null;
+  status: string;
+  created_at: string;
+  invited_by: string;
+}
+
+interface TontineData {
+  id: string;
+  name: string;
+  description: string | null;
+  amount: number;
+  currency: string;
+  frequency: string;
+  max_members: number;
+  admin_id: string;
+  created_at: string;
+  members: Member[];
+  cycles: PaymentCycle[];
+  invitations: Invitation[];
+  userRole: string | null;
+  isAdmin: boolean;
+}
+
 const TontineDetail = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -40,7 +89,6 @@ const TontineDetail = () => {
     queryFn: async () => {
       if (!user || !id) return null;
       
-      // Get tontine details
       const { data: tontine, error: tontineError } = await supabase
         .from('tontine_groups')
         .select('*')
@@ -52,7 +100,6 @@ const TontineDetail = () => {
         throw tontineError;
       }
       
-      // Get members with their profile information
       const { data: members, error: membersError } = await supabase
         .from('group_members')
         .select(`
@@ -61,7 +108,7 @@ const TontineDetail = () => {
           status,
           joined_at,
           user_id,
-          profiles:user_id(id, full_name, email, avatar_url)
+          profiles:profiles!user_id(id, full_name, email, avatar_url)
         `)
         .eq('group_id', id);
         
@@ -70,7 +117,6 @@ const TontineDetail = () => {
         throw membersError;
       }
       
-      // Get payment cycles with recipient profiles
       const { data: cycles, error: cyclesError } = await supabase
         .from('payment_cycles')
         .select(`
@@ -78,7 +124,7 @@ const TontineDetail = () => {
           cycle_month,
           status,
           recipient_id,
-          recipient:recipient_id(id, full_name, email, avatar_url)
+          recipient:profiles!recipient_id(id, full_name, email, avatar_url)
         `)
         .eq('group_id', id)
         .order('cycle_month', { ascending: true });
@@ -88,7 +134,6 @@ const TontineDetail = () => {
         throw cyclesError;
       }
       
-      // Get invitations
       const { data: invitations, error: invitationsError } = await supabase
         .from('invitations')
         .select('*')
@@ -99,7 +144,6 @@ const TontineDetail = () => {
         throw invitationsError;
       }
       
-      // Get user's role
       const { data: userRole, error: userRoleError } = await supabase
         .from('group_members')
         .select('role')
@@ -112,7 +156,6 @@ const TontineDetail = () => {
         throw userRoleError;
       }
       
-      // Format response
       return {
         ...tontine,
         members: members || [],
@@ -120,7 +163,7 @@ const TontineDetail = () => {
         invitations: invitations || [],
         userRole: userRole?.role || (tontine.admin_id === user.id ? 'admin' : null),
         isAdmin: tontine.admin_id === user.id || userRole?.role === 'admin'
-      };
+      } as TontineData;
     },
     enabled: !!user && !!id,
   });
@@ -403,7 +446,7 @@ const TontineDetail = () => {
                               <p className="text-sm text-muted-foreground capitalize">{member.role}</p>
                             </div>
                           </div>
-                          {tontineData.isAdmin && member.profiles?.id !== user?.id && (
+                          {tontineData.isAdmin && member.user_id !== user?.id && (
                             <Button size="sm" variant="outline">
                               Manage
                             </Button>
