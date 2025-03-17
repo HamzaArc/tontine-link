@@ -157,29 +157,34 @@ const TontineDetail = () => {
       }
       
       const processedMembers = members?.map(member => {
-        const hasValidProfile = !member.profiles?.error && typeof member.profiles === 'object';
+        const hasValidProfile = member.profiles && 
+                               typeof member.profiles === 'object' && 
+                               !('error' in member.profiles);
         
         return {
           ...member,
           profiles: {
-            id: hasValidProfile ? member.profiles?.id || "" : "",
-            full_name: hasValidProfile ? member.profiles?.full_name || null : null,
-            email: hasValidProfile ? member.profiles?.email || "" : "",
-            avatar_url: hasValidProfile ? member.profiles?.avatar_url || null : null
+            id: hasValidProfile && member.profiles?.id ? member.profiles.id : "",
+            full_name: hasValidProfile && member.profiles?.full_name ? member.profiles.full_name : null,
+            email: hasValidProfile && member.profiles?.email ? member.profiles.email : "",
+            avatar_url: hasValidProfile && member.profiles?.avatar_url ? member.profiles.avatar_url : null
           }
         } as Member;
       }) || [];
       
       const processedCycles = cycles?.map(cycle => {
-        const hasValidRecipient = cycle.recipient_id && !cycle.recipient?.error && typeof cycle.recipient === 'object';
+        const hasValidRecipient = cycle.recipient_id && 
+                                 cycle.recipient && 
+                                 typeof cycle.recipient === 'object' && 
+                                 !('error' in cycle.recipient);
         
         return {
           ...cycle,
           recipient: cycle.recipient_id ? {
-            id: hasValidRecipient ? cycle.recipient?.id || "" : "",
-            full_name: hasValidRecipient ? cycle.recipient?.full_name || null : null,
-            email: hasValidRecipient ? cycle.recipient?.email || "" : "",
-            avatar_url: hasValidRecipient ? cycle.recipient?.avatar_url || null : null
+            id: hasValidRecipient && cycle.recipient?.id ? cycle.recipient.id : "",
+            full_name: hasValidRecipient && cycle.recipient?.full_name ? cycle.recipient.full_name : null,
+            email: hasValidRecipient && cycle.recipient?.email ? cycle.recipient.email : "",
+            avatar_url: hasValidRecipient && cycle.recipient?.avatar_url ? cycle.recipient.avatar_url : null
           } : null
         } as PaymentCycle;
       }) || [];
@@ -269,7 +274,7 @@ const TontineDetail = () => {
     );
   }
   
-  const cycleProgress = tontineData.cycles.length > 0
+  const cycleProgress = tontineData?.cycles.length > 0
     ? Math.round((tontineData.cycles.filter(c => c.status === 'completed').length / tontineData.max_members) * 100)
     : 0;
 
@@ -591,3 +596,4 @@ const TontineDetail = () => {
 };
 
 export default TontineDetail;
+
