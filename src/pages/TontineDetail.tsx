@@ -1,3 +1,4 @@
+
 import { useParams, useNavigate, Navigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { ChevronLeft, Users, Calendar, DollarSign, Clock, Mail, Phone } from "lucide-react";
@@ -89,6 +90,7 @@ const TontineDetail = () => {
     queryFn: async () => {
       if (!user || !id) return null;
       
+      // Fetch the tontine group data
       const { data: tontine, error: tontineError } = await supabase
         .from('tontine_groups')
         .select('*')
@@ -100,16 +102,10 @@ const TontineDetail = () => {
         throw tontineError;
       }
       
+      // Fetch members data with separate query for profiles
       const { data: members, error: membersError } = await supabase
         .from('group_members')
-        .select(`
-          id,
-          role,
-          status,
-          joined_at,
-          user_id,
-          profiles:user_id(id, full_name, email, avatar_url)
-        `)
+        .select('id, role, status, joined_at, user_id')
         .eq('group_id', id);
         
       if (membersError) {
@@ -117,15 +113,29 @@ const TontineDetail = () => {
         throw membersError;
       }
       
+      // Fetch profiles for all members
+      const memberProfiles: Record<string, Profile> = {};
+      if (members && members.length > 0) {
+        const userIds = members.map(member => member.user_id);
+        const { data: profiles, error: profilesError } = await supabase
+          .from('profiles')
+          .select('id, full_name, email, avatar_url')
+          .in('id', userIds);
+          
+        if (profilesError) {
+          console.error("Error fetching profiles:", profilesError);
+          // Don't throw here, we can still show partial data
+        } else if (profiles) {
+          profiles.forEach(profile => {
+            memberProfiles[profile.id] = profile as Profile;
+          });
+        }
+      }
+      
+      // Fetch cycles data with separate query for recipient profiles
       const { data: cycles, error: cyclesError } = await supabase
         .from('payment_cycles')
-        .select(`
-          id,
-          cycle_month,
-          status,
-          recipient_id,
-          recipient:recipient_id(id, full_name, email, avatar_url)
-        `)
+        .select('id, cycle_month, status, recipient_id')
         .eq('group_id', id)
         .order('cycle_month', { ascending: true });
         
@@ -134,6 +144,31 @@ const TontineDetail = () => {
         throw cyclesError;
       }
       
+      // Fetch recipient profiles for all cycles
+      const recipientProfiles: Record<string, Profile> = {};
+      if (cycles && cycles.length > 0) {
+        const recipientIds = cycles
+          .map(cycle => cycle.recipient_id)
+          .filter((id): id is string => id !== null);
+          
+        if (recipientIds.length > 0) {
+          const { data: profiles, error: profilesError } = await supabase
+            .from('profiles')
+            .select('id, full_name, email, avatar_url')
+            .in('id', recipientIds);
+            
+          if (profilesError) {
+            console.error("Error fetching recipient profiles:", profilesError);
+            // Don't throw here, we can still show partial data
+          } else if (profiles) {
+            profiles.forEach(profile => {
+              recipientProfiles[profile.id] = profile as Profile;
+            });
+          }
+        }
+      }
+      
+      // Fetch invitations
       const { data: invitations, error: invitationsError } = await supabase
         .from('invitations')
         .select('*')
@@ -144,51 +179,45 @@ const TontineDetail = () => {
         throw invitationsError;
       }
       
+      // Fetch user role
       const { data: userRole, error: userRoleError } = await supabase
         .from('group_members')
         .select('role')
         .eq('group_id', id)
         .eq('user_id', user.id)
-        .single();
+        .maybeSingle();
         
       if (userRoleError && userRoleError.code !== 'PGRST116') {
         console.error("Error fetching user role:", userRoleError);
-        throw userRoleError;
+        // Don't throw, user might not be a member
       }
       
+      // Process members with their profiles
       const processedMembers = members?.map(member => {
-        const hasValidProfile = member.profiles && 
-                               typeof member.profiles === 'object' && 
-                               !('error' in member.profiles);
+        const profile = memberProfiles[member.user_id] || {
+          id: member.user_id,
+          full_name: null,
+          email: "",
+          avatar_url: null
+        };
         
         return {
           ...member,
-          profiles: {
-            id: hasValidProfile && member.profiles?.id ? member.profiles.id : "",
-            full_name: hasValidProfile && member.profiles?.full_name ? member.profiles.full_name : null,
-            email: hasValidProfile && member.profiles?.email ? member.profiles.email : "",
-            avatar_url: hasValidProfile && member.profiles?.avatar_url ? member.profiles.avatar_url : null
-          }
+          profiles: profile
         } as Member;
       }) || [];
       
+      // Process cycles with their recipient profiles
       const processedCycles = cycles?.map(cycle => {
-        const hasValidRecipient = cycle.recipient_id && 
-                                 cycle.recipient && 
-                                 typeof cycle.recipient === 'object' && 
-                                 !('error' in cycle.recipient);
+        const recipient = cycle.recipient_id ? recipientProfiles[cycle.recipient_id] || null : null;
         
         return {
           ...cycle,
-          recipient: cycle.recipient_id ? {
-            id: hasValidRecipient && cycle.recipient?.id ? cycle.recipient.id : "",
-            full_name: hasValidRecipient && cycle.recipient?.full_name ? cycle.recipient.full_name : null,
-            email: hasValidRecipient && cycle.recipient?.email ? cycle.recipient.email : "",
-            avatar_url: hasValidRecipient && cycle.recipient?.avatar_url ? cycle.recipient.avatar_url : null
-          } : null
+          recipient
         } as PaymentCycle;
       }) || [];
       
+      // Compile and return the final tontine data
       return {
         ...tontine,
         members: processedMembers,
@@ -274,7 +303,7 @@ const TontineDetail = () => {
     );
   }
   
-  const cycleProgress = tontineData?.cycles.length > 0
+  const cycleProgress = tontineData.cycles.length > 0
     ? Math.round((tontineData.cycles.filter(c => c.status === 'completed').length / tontineData.max_members) * 100)
     : 0;
 
