@@ -1,6 +1,8 @@
+
 import { useState } from "react";
 import { useNavigate, Navigate } from "react-router-dom";
 import { ChevronLeft, Plus, X, HelpCircle } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
 import Navbar from "@/components/Navbar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -13,6 +15,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
+import { supabase } from "@/integrations/supabase/client";
 
 const CreateGroup = () => {
   const navigate = useNavigate();
@@ -27,6 +30,7 @@ const CreateGroup = () => {
   const [memberLimit, setMemberLimit] = useState("");
   const [invitedEmails, setInvitedEmails] = useState<string[]>([]);
   const [newEmail, setNewEmail] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
   
   // Step state
   const [currentStep, setCurrentStep] = useState(1);
@@ -67,26 +71,81 @@ const CreateGroup = () => {
     setCurrentStep(currentStep - 1);
   };
   
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Here we would typically send the data to the backend
-    console.log({
-      tontineName,
-      description,
-      amount,
-      currency,
-      memberLimit,
-      invitedEmails,
-    });
+    if (!user) {
+      toast({
+        title: "Authentication required",
+        description: "You must be logged in to create a tontine group.",
+        variant: "destructive",
+      });
+      return;
+    }
     
-    toast({
-      title: "Tontine Created",
-      description: "Your new tontine group has been created successfully!",
-    });
+    setIsSubmitting(true);
     
-    // Navigate to dashboard after creation
-    navigate("/dashboard");
+    try {
+      // Insert the tontine group
+      const { data: tontineGroup, error: tontineError } = await supabase
+        .from("tontine_groups")
+        .insert({
+          name: tontineName,
+          description,
+          amount: parseFloat(amount),
+          currency,
+          max_members: parseInt(memberLimit),
+          admin_id: user.id
+        })
+        .select()
+        .single();
+      
+      if (tontineError) throw tontineError;
+      
+      // Automatically add the creator as a member with 'admin' role and 'active' status
+      const { error: memberError } = await supabase
+        .from("group_members")
+        .insert({
+          group_id: tontineGroup.id,
+          user_id: user.id,
+          role: "admin",
+          status: "active"
+        });
+      
+      if (memberError) throw memberError;
+      
+      // Send invitations to the provided emails
+      if (invitedEmails.length > 0) {
+        const invitations = invitedEmails.map(email => ({
+          group_id: tontineGroup.id,
+          email,
+          invited_by: user.id
+        }));
+        
+        const { error: inviteError } = await supabase
+          .from("invitations")
+          .insert(invitations);
+        
+        if (inviteError) throw inviteError;
+      }
+      
+      toast({
+        title: "Tontine Created",
+        description: "Your new tontine group has been created successfully!",
+      });
+      
+      // Navigate to dashboard after creation
+      navigate("/dashboard");
+    } catch (error: any) {
+      console.error("Error creating tontine:", error);
+      toast({
+        title: "Error creating tontine",
+        description: error.message || "An error occurred while creating the tontine group.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
   
   if (loading) {
@@ -316,8 +375,15 @@ const CreateGroup = () => {
                         Next Step
                       </Button>
                     ) : (
-                      <Button type="submit">
-                        Create Tontine
+                      <Button type="submit" disabled={isSubmitting}>
+                        {isSubmitting ? (
+                          <>
+                            <LoadingSpinner size="sm" />
+                            <span className="ml-2">Creating...</span>
+                          </>
+                        ) : (
+                          "Create Tontine"
+                        )}
                       </Button>
                     )}
                   </div>
