@@ -1,5 +1,5 @@
-
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { Navigate } from "react-router-dom";
 import { User, Mail, Phone, Lock, Bell, LogOut } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -11,28 +11,54 @@ import { Switch } from "@/components/ui/switch";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
 import { cn } from "@/lib/utils";
+import { LoadingSpinner } from "@/components/ui/loading-spinner";
 
 const Profile = () => {
   const { toast } = useToast();
+  const { user, profile, loading, signOut, updateProfile } = useAuth();
   const [activeTab, setActiveTab] = useState("account");
   const [isEditing, setIsEditing] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   
-  // Mock user data
+  if (!loading && !user) {
+    return <Navigate to="/auth" replace />;
+  }
+  
   const [userData, setUserData] = useState({
-    name: "Mohammed Alami",
-    email: "mohammed.alami@example.com",
-    phone: "+212 611223344",
+    name: "",
+    email: "",
+    phone: "",
     avatar: "",
   });
   
-  const handleSaveProfile = () => {
-    setIsEditing(false);
-    toast({
-      title: "Profile updated",
-      description: "Your profile information has been saved successfully.",
-    });
+  useEffect(() => {
+    if (profile) {
+      setUserData({
+        name: profile.full_name || "",
+        email: profile.email || user?.email || "",
+        phone: profile.phone || "",
+        avatar: profile.avatar_url || "",
+      });
+    }
+  }, [profile, user]);
+  
+  const handleSaveProfile = async () => {
+    setIsSaving(true);
+    try {
+      await updateProfile({
+        full_name: userData.name,
+      });
+      setIsEditing(false);
+    } finally {
+      setIsSaving(false);
+    }
   };
+  
+  if (loading) {
+    return <LoadingSpinner />;
+  }
   
   return (
     <div className="min-h-screen bg-background flex flex-col">
@@ -46,10 +72,10 @@ const Profile = () => {
                 <Avatar className="h-24 w-24 mb-4 ring-4 ring-primary/10">
                   <AvatarImage src={userData.avatar} />
                   <AvatarFallback className="text-2xl bg-primary/5 border-2">
-                    {userData.name.split(' ').map(part => part[0]).join('')}
+                    {userData.name ? userData.name.split(' ').map(part => part[0]).join('').toUpperCase() : "U"}
                   </AvatarFallback>
                 </Avatar>
-                <h2 className="text-xl font-bold text-center">{userData.name}</h2>
+                <h2 className="text-xl font-bold text-center">{userData.name || 'User'}</h2>
                 <p className="text-sm text-muted-foreground text-center mt-1">{userData.email}</p>
               </div>
               
@@ -116,7 +142,11 @@ const Profile = () => {
                 </TabsList>
               </Tabs>
               
-              <Button variant="outline" className="w-full mt-6 text-destructive">
+              <Button 
+                variant="outline" 
+                className="w-full mt-6 text-destructive"
+                onClick={signOut}
+              >
                 <LogOut className="mr-2 h-4 w-4" />
                 Log Out
               </Button>
@@ -140,11 +170,28 @@ const Profile = () => {
                       </Button>
                     ) : (
                       <div className="flex gap-2">
-                        <Button size="sm" variant="outline" onClick={() => setIsEditing(false)}>
+                        <Button size="sm" variant="outline" onClick={() => {
+                          setIsEditing(false);
+                          if (profile) {
+                            setUserData({
+                              name: profile.full_name || "",
+                              email: profile.email || user?.email || "",
+                              phone: profile.phone || "",
+                              avatar: profile.avatar_url || "",
+                            });
+                          }
+                        }}>
                           Cancel
                         </Button>
-                        <Button size="sm" onClick={handleSaveProfile}>
-                          Save Changes
+                        <Button size="sm" onClick={handleSaveProfile} disabled={isSaving}>
+                          {isSaving ? (
+                            <>
+                              <LoadingSpinner className="mr-2 h-4 w-4" />
+                              Saving...
+                            </>
+                          ) : (
+                            "Save Changes"
+                          )}
                         </Button>
                       </div>
                     )}
@@ -176,9 +223,8 @@ const Profile = () => {
                             type="email"
                             placeholder="Your email address"
                             value={userData.email}
-                            onChange={(e) => setUserData({ ...userData, email: e.target.value })}
                             className="pl-9"
-                            disabled={!isEditing}
+                            disabled={true}
                           />
                         </div>
                       </div>
@@ -208,7 +254,7 @@ const Profile = () => {
                       <Avatar className="h-20 w-20">
                         <AvatarImage src={userData.avatar} />
                         <AvatarFallback className="text-xl bg-primary/5 border-2">
-                          {userData.name.split(' ').map(part => part[0]).join('')}
+                          {userData.name ? userData.name.split(' ').map(part => part[0]).join('').toUpperCase() : "U"}
                         </AvatarFallback>
                       </Avatar>
                       <div className="space-y-2">

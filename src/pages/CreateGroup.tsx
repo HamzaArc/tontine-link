@@ -1,6 +1,5 @@
-
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Navigate } from "react-router-dom";
 import { ChevronLeft, Plus, X, HelpCircle } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import { Button } from "@/components/ui/button";
@@ -12,10 +11,13 @@ import { Separator } from "@/components/ui/separator";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
+import { LoadingSpinner } from "@/components/ui/loading-spinner";
 
 const CreateGroup = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { user, loading } = useAuth();
   
   // Form states
   const [tontineName, setTontineName] = useState("");
@@ -28,6 +30,11 @@ const CreateGroup = () => {
   
   // Step state
   const [currentStep, setCurrentStep] = useState(1);
+  
+  // If not authenticated, redirect to login
+  if (!loading && !user) {
+    return <Navigate to="/auth" replace />;
+  }
   
   const handleEmailAdd = () => {
     if (newEmail && !invitedEmails.includes(newEmail)) {
@@ -81,6 +88,10 @@ const CreateGroup = () => {
     // Navigate to dashboard after creation
     navigate("/dashboard");
   };
+  
+  if (loading) {
+    return <LoadingSpinner />;
+  }
   
   return (
     <div className="min-h-screen bg-background flex flex-col">

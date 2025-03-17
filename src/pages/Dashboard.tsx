@@ -1,12 +1,10 @@
-
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, Navigate } from "react-router-dom";
 import { Plus, Filter, Search } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import { TontineCard } from "@/components/ui/tontine-card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
   DropdownMenu,
@@ -16,8 +14,9 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { useAuth } from "@/contexts/AuthContext";
+import { LoadingSpinner } from "@/components/ui/loading-spinner";
 
-// Mock data for demonstration
 const mockTontines = [
   {
     id: "1",
@@ -70,10 +69,14 @@ const mockTontines = [
 ];
 
 const Dashboard = () => {
+  const { user, loading } = useAuth();
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState("all");
   
-  // Filter tontines based on search query and active tab
+  if (!loading && !user) {
+    return <Navigate to="/auth" replace />;
+  }
+
   const filteredTontines = mockTontines.filter(tontine => {
     const matchesSearch = tontine.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
                          tontine.description.toLowerCase().includes(searchQuery.toLowerCase());
@@ -85,6 +88,10 @@ const Dashboard = () => {
     
     return matchesSearch;
   });
+
+  if (loading) {
+    return <LoadingSpinner />;
+  }
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
