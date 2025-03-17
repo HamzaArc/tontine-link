@@ -52,7 +52,7 @@ const TontineDetail = () => {
         throw tontineError;
       }
       
-      // Get members
+      // Get members with their profile information
       const { data: members, error: membersError } = await supabase
         .from('group_members')
         .select(`
@@ -60,6 +60,7 @@ const TontineDetail = () => {
           role,
           status,
           joined_at,
+          user_id,
           profiles:user_id(id, full_name, email, avatar_url)
         `)
         .eq('group_id', id);
@@ -69,7 +70,7 @@ const TontineDetail = () => {
         throw membersError;
       }
       
-      // Get payment cycles
+      // Get payment cycles with recipient profiles
       const { data: cycles, error: cyclesError } = await supabase
         .from('payment_cycles')
         .select(`
@@ -77,7 +78,7 @@ const TontineDetail = () => {
           cycle_month,
           status,
           recipient_id,
-          profiles:recipient_id(id, full_name, email, avatar_url)
+          recipient:recipient_id(id, full_name, email, avatar_url)
         `)
         .eq('group_id', id)
         .order('cycle_month', { ascending: true });
@@ -301,14 +302,14 @@ const TontineDetail = () => {
                               </p>
                             </div>
                             <div className="flex items-center">
-                              {cycle.profiles && (
+                              {cycle.recipient && (
                                 <div className="flex items-center mr-3">
                                   <Avatar className="h-8 w-8 mr-2">
-                                    <AvatarImage src={cycle.profiles.avatar_url || undefined} />
-                                    <AvatarFallback>{(cycle.profiles.full_name || cycle.profiles.email || "").substring(0, 2).toUpperCase()}</AvatarFallback>
+                                    <AvatarImage src={cycle.recipient.avatar_url || undefined} />
+                                    <AvatarFallback>{(cycle.recipient.full_name || cycle.recipient.email || "").substring(0, 2).toUpperCase()}</AvatarFallback>
                                   </Avatar>
                                   <div className="text-sm">
-                                    <p className="font-medium">{cycle.profiles.full_name || cycle.profiles.email}</p>
+                                    <p className="font-medium">{cycle.recipient.full_name || cycle.recipient.email}</p>
                                     <p className="text-muted-foreground">Recipient</p>
                                   </div>
                                 </div>
@@ -464,7 +465,7 @@ const TontineDetail = () => {
                 <div className="space-y-1">
                   <p className="text-sm font-medium text-muted-foreground">Admin</p>
                   <p>
-                    {tontineData.members.find(m => m.profiles?.id === tontineData.admin_id)?.profiles?.full_name ||
+                    {tontineData.members.find(m => m.user_id === tontineData.admin_id)?.profiles?.full_name ||
                     "Unknown"}
                   </p>
                 </div>
