@@ -157,25 +157,29 @@ const TontineDetail = () => {
       }
       
       const processedMembers = members?.map(member => {
+        const hasValidProfile = !member.profiles?.error && typeof member.profiles === 'object';
+        
         return {
           ...member,
           profiles: {
-            id: member.profiles?.id || "",
-            full_name: member.profiles?.full_name || null,
-            email: member.profiles?.email || "",
-            avatar_url: member.profiles?.avatar_url || null
+            id: hasValidProfile ? member.profiles?.id || "" : "",
+            full_name: hasValidProfile ? member.profiles?.full_name || null : null,
+            email: hasValidProfile ? member.profiles?.email || "" : "",
+            avatar_url: hasValidProfile ? member.profiles?.avatar_url || null : null
           }
         } as Member;
       }) || [];
       
       const processedCycles = cycles?.map(cycle => {
+        const hasValidRecipient = cycle.recipient_id && !cycle.recipient?.error && typeof cycle.recipient === 'object';
+        
         return {
           ...cycle,
           recipient: cycle.recipient_id ? {
-            id: cycle.recipient?.id || "",
-            full_name: cycle.recipient?.full_name || null,
-            email: cycle.recipient?.email || "",
-            avatar_url: cycle.recipient?.avatar_url || null
+            id: hasValidRecipient ? cycle.recipient?.id || "" : "",
+            full_name: hasValidRecipient ? cycle.recipient?.full_name || null : null,
+            email: hasValidRecipient ? cycle.recipient?.email || "" : "",
+            avatar_url: hasValidRecipient ? cycle.recipient?.avatar_url || null : null
           } : null
         } as PaymentCycle;
       }) || [];
