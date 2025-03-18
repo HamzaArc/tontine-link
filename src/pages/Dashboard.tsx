@@ -39,16 +39,18 @@ interface TontineGroup {
 }
 
 const Dashboard = () => {
-  const { user, loading } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState("all");
   
-  const { data: tontineGroups, isLoading: loadingGroups } = useQuery({
-    queryKey: ['tontineGroups', user?.id],
-    queryFn: async () => {
-      if (!user) return [];
-      
+  console.log("Dashboard rendering, user:", user?.id);
+
+  const fetchTontineGroups = async () => {
+    console.log("Fetching tontine groups for user:", user?.id);
+    if (!user) return [];
+    
+    try {
       // Fetch all groups where the user is a member
       const { data: memberGroups, error: memberError } = await supabase
         .from('group_members')
@@ -65,7 +67,9 @@ const Dashboard = () => {
         throw memberError;
       }
       
-      // Also fetch groups where the user is an admin (if not already fetched)
+      console.log("Member groups fetched:", memberGroups);
+      
+      // Also fetch groups where the user is an admin
       const { data: adminGroups, error: adminError } = await supabase
         .from('tontine_groups')
         .select('*')
@@ -75,6 +79,8 @@ const Dashboard = () => {
         console.error("Error fetching admin groups:", adminError);
         throw adminError;
       }
+      
+      console.log("Admin groups fetched:", adminGroups);
       
       // Combine and format the results
       const formattedGroups: TontineGroup[] = [];
@@ -105,54 +111,94 @@ const Dashboard = () => {
         }
       }
       
-      // Fetch additional data for each group
-      for (const group of formattedGroups) {
-        // Fetch member count
-        const { count: membersCount, error: countError } = await supabase
-          .from('group_members')
-          .select('*', { count: 'exact', head: true })
-          .eq('group_id', group.id)
-          .eq('status', 'active');
-        
-        if (!countError) {
-          group.members_count = membersCount || 0;
-          group.total_members = group.max_members;
-        }
-        
-        // Fetch payment cycles
-        const { data: cycles, error: cycleError } = await supabase
-          .from('payment_cycles')
-          .select('*')
-          .eq('group_id', group.id)
-          .order('cycle_month', { ascending: true });
-        
-        if (!cycleError && cycles && cycles.length > 0) {
-          // Calculate cycle progress
-          const totalCycles = group.max_members;
-          const completedCycles = cycles.filter(c => c.status === 'completed').length;
-          group.cycle_progress = Math.round((completedCycles / totalCycles) * 100);
-          
-          // Find the next payment
-          const activeCycle = cycles.find(c => c.status === 'active');
-          if (activeCycle) {
-            const cycleDate = new Date(activeCycle.cycle_month);
-            group.next_payment = cycleDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-          }
-        } else {
-          group.cycle_progress = 0;
-        }
-      }
+      console.log("Combined groups before enrichment:", formattedGroups);
       
-      return formattedGroups;
-    },
+      // Enrich each group with additional data
+      const enrichedGroups = await Promise.all(
+        formattedGroups.map(async (group) => {
+          try {
+            // Fetch member count
+            const { count: membersCount, error: countError } = await supabase
+              .from('group_members')
+              .select('*', { count: 'exact', head: true })
+              .eq('group_id', group.id)
+              .eq('status', 'active');
+            
+            if (!countError) {
+              group.members_count = membersCount || 0;
+              group.total_members = group.max_members;
+            }
+            
+            // Fetch payment cycles
+            const { data: cycles, error: cycleError } = await supabase
+              .from('payment_cycles')
+              .select('*')
+              .eq('group_id', group.id)
+              .order('cycle_month', { ascending: true });
+            
+            if (!cycleError && cycles && cycles.length > 0) {
+              // Calculate cycle progress
+              const totalCycles = group.max_members;
+              const completedCycles = cycles.filter(c => c.status === 'completed').length;
+              group.cycle_progress = Math.round((completedCycles / totalCycles) * 100);
+              
+              // Find the next payment
+              const activeCycle = cycles.find(c => c.status === 'active');
+              if (activeCycle) {
+                const cycleDate = new Date(activeCycle.cycle_month);
+                group.next_payment = cycleDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+              }
+            } else {
+              group.cycle_progress = 0;
+            }
+            
+            return group;
+          } catch (err) {
+            console.error("Error enriching group data:", err, "Group:", group.id);
+            return group;
+          }
+        })
+      );
+      
+      console.log("Final enriched groups:", enrichedGroups);
+      return enrichedGroups;
+    } catch (err) {
+      console.error("Error in fetchTontineGroups:", err);
+      toast({
+        title: "Error",
+        description: "Failed to load tontine groups. Please try again.",
+        variant: "destructive",
+      });
+      return [];
+    }
+  };
+  
+  const { data: tontineGroups, isLoading: loadingGroups, error } = useQuery({
+    queryKey: ['tontineGroups', user?.id],
+    queryFn: fetchTontineGroups,
     enabled: !!user,
+    retry: 2,
   });
   
-  if (!loading && !user) {
+  if (error) {
+    console.error("Query error:", error);
+  }
+  
+  // If user is still loading, show loading spinner
+  if (authLoading) {
+    console.log("Auth is still loading");
+    return <LoadingSpinner />;
+  }
+  
+  // If user is not authenticated and not loading, redirect to auth
+  if (!user && !authLoading) {
+    console.log("User not authenticated, redirecting to auth");
     return <Navigate to="/auth" replace />;
   }
 
   const filteredTontines = tontineGroups?.filter(tontine => {
+    if (!tontine) return false;
+    
     const matchesSearch = tontine.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
                          (tontine.description && tontine.description.toLowerCase().includes(searchQuery.toLowerCase()));
     
@@ -164,9 +210,16 @@ const Dashboard = () => {
     return matchesSearch;
   }) || [];
 
-  if (loading || loadingGroups) {
+  // Show loading spinner while groups are being fetched
+  if (loadingGroups) {
+    console.log("Tontine groups are still loading");
     return <LoadingSpinner />;
   }
+
+  console.log("Rendering dashboard with data:", { 
+    filteredTontines: filteredTontines.length,
+    activeTab
+  });
 
   return (
     <div className="min-h-screen bg-background flex flex-col">

@@ -28,22 +28,30 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   useEffect(() => {
     const fetchSession = async () => {
-      setLoading(true);
-      const { data, error } = await supabase.auth.getSession();
-      
-      if (error) {
-        console.error("Error fetching session:", error);
+      try {
+        setLoading(true);
+        console.log("Fetching session...");
+        const { data, error } = await supabase.auth.getSession();
+        
+        if (error) {
+          console.error("Error fetching session:", error);
+          setLoading(false);
+          return;
+        }
+        
+        if (data?.session) {
+          console.log("Session found:", data.session.user.id);
+          setSession(data.session);
+          setUser(data.session.user);
+          await fetchProfile(data.session.user.id);
+        } else {
+          console.log("No session found");
+        }
+      } catch (err) {
+        console.error("Unexpected error in fetchSession:", err);
+      } finally {
         setLoading(false);
-        return;
       }
-      
-      if (data?.session) {
-        setSession(data.session);
-        setUser(data.session.user);
-        await fetchProfile(data.session.user.id);
-      }
-      
-      setLoading(false);
     };
 
     fetchSession();
@@ -68,18 +76,24 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   }, []);
 
   const fetchProfile = async (userId: string) => {
-    const { data, error } = await supabase
-      .from("profiles")
-      .select("*")
-      .eq("id", userId)
-      .single();
-    
-    if (error) {
-      console.error("Error fetching profile:", error);
-      return;
+    try {
+      console.log("Fetching profile for user:", userId);
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("id", userId)
+        .maybeSingle();
+      
+      if (error) {
+        console.error("Error fetching profile:", error);
+        return;
+      }
+      
+      console.log("Profile data:", data);
+      setProfile(data);
+    } catch (err) {
+      console.error("Unexpected error in fetchProfile:", err);
     }
-    
-    setProfile(data);
   };
 
   const signIn = async (email: string, password: string) => {
