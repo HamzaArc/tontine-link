@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Navigate } from "react-router-dom";
 import { User, Mail, Phone, Lock, Bell, LogOut } from "lucide-react";
@@ -22,7 +23,14 @@ const Profile = () => {
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   
+  // For debugging
+  useEffect(() => {
+    console.log("Profile page rendering. User:", user?.id, "Profile:", profile, "Loading:", loading);
+  }, [user, profile, loading]);
+  
+  // Redirect to login if not authenticated
   if (!loading && !user) {
+    console.log("User not authenticated, redirecting to auth");
     return <Navigate to="/auth" replace />;
   }
   
@@ -33,13 +41,23 @@ const Profile = () => {
     avatar: "",
   });
   
+  // Update form state when profile data changes
   useEffect(() => {
     if (profile) {
+      console.log("Setting user data from profile:", profile);
       setUserData({
         name: profile.full_name || "",
         email: profile.email || user?.email || "",
         phone: profile.phone || "",
         avatar: profile.avatar_url || "",
+      });
+    } else if (user) {
+      console.log("Setting user data from user:", user);
+      setUserData({
+        name: user.user_metadata?.full_name || "",
+        email: user.email || "",
+        phone: "",
+        avatar: "",
       });
     }
   }, [profile, user]);
@@ -47,18 +65,38 @@ const Profile = () => {
   const handleSaveProfile = async () => {
     setIsSaving(true);
     try {
+      console.log("Updating profile with:", { full_name: userData.name });
       await updateProfile({
         full_name: userData.name,
       });
       setIsEditing(false);
+      toast({
+        title: "Profile updated",
+        description: "Your profile has been updated successfully.",
+      });
+    } catch (error) {
+      console.error("Error updating profile:", error);
+      toast({
+        title: "Update failed",
+        description: "Failed to update profile. Please try again.",
+        variant: "destructive",
+      });
     } finally {
       setIsSaving(false);
     }
   };
   
+  // Show a full-page loading spinner when auth is loading
   if (loading) {
-    return <LoadingSpinner />;
+    console.log("Auth is loading, showing spinner");
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <LoadingSpinner size="lg" />
+      </div>
+    );
   }
+  
+  console.log("Rendering profile page with userData:", userData);
   
   return (
     <div className="min-h-screen bg-background flex flex-col">

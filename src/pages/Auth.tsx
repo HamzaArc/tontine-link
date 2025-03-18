@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Navigate } from "react-router-dom";
 import { Mail, Lock, User, ChevronLeft } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
@@ -27,13 +27,20 @@ const Auth = () => {
   const [fullName, setFullName] = useState("");
   const [isRegistering, setIsRegistering] = useState(false);
   
+  // For debugging
+  useEffect(() => {
+    console.log("Auth page rendering. User:", user, "Loading:", loading);
+  }, [user, loading]);
+  
   // If user is already authenticated, redirect to dashboard
   if (user && !loading) {
+    console.log("User is authenticated, redirecting to dashboard");
     return <Navigate to="/dashboard" replace />;
   }
   
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    console.log("Login attempt with:", loginEmail);
     setIsLoggingIn(true);
     try {
       await signIn(loginEmail, loginPassword);
@@ -44,6 +51,7 @@ const Auth = () => {
   
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
+    console.log("Register attempt with:", registerEmail);
     
     // Validation
     if (registerPassword !== confirmPassword) {
@@ -64,9 +72,17 @@ const Auth = () => {
     }
   };
   
+  // Show a full-page loading spinner when auth is loading
   if (loading) {
-    return <LoadingSpinner />;
+    console.log("Auth is loading, showing spinner");
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <LoadingSpinner size="lg" />
+      </div>
+    );
   }
+  
+  console.log("Rendering auth form");
   
   return (
     <div className="min-h-screen bg-background flex flex-col">

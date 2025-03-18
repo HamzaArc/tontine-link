@@ -17,7 +17,16 @@ import Auth from "./pages/Auth";
 import TontineDetail from "./pages/TontineDetail";
 import { LoadingPage } from "./components/ui/loading-spinner";
 
-const queryClient = new QueryClient();
+// Create a new instance of QueryClient with appropriate settings
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: 1,
+      refetchOnWindowFocus: false,
+      staleTime: 30000,
+    },
+  },
+});
 
 const App = () => (
   <QueryClientProvider client={queryClient}>

@@ -1,8 +1,7 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate, Navigate } from "react-router-dom";
 import { ChevronLeft, Plus, X, HelpCircle } from "lucide-react";
-import { useQuery } from "@tanstack/react-query";
 import Navbar from "@/components/Navbar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -22,6 +21,10 @@ const CreateGroup = () => {
   const { toast } = useToast();
   const { user, loading } = useAuth();
   
+  useEffect(() => {
+    console.log("CreateGroup page rendering. User:", user?.id, "Loading:", loading);
+  }, [user, loading]);
+  
   // Form states
   const [tontineName, setTontineName] = useState("");
   const [description, setDescription] = useState("");
@@ -35,8 +38,19 @@ const CreateGroup = () => {
   // Step state
   const [currentStep, setCurrentStep] = useState(1);
   
+  // Show a full-page loading spinner when auth is loading
+  if (loading) {
+    console.log("Auth is loading, showing spinner");
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <LoadingSpinner size="lg" />
+      </div>
+    );
+  }
+  
   // If not authenticated, redirect to login
   if (!loading && !user) {
+    console.log("User not authenticated, redirecting to auth");
     return <Navigate to="/auth" replace />;
   }
   
@@ -86,6 +100,8 @@ const CreateGroup = () => {
     setIsSubmitting(true);
     
     try {
+      console.log("Creating tontine group for user:", user.id);
+      
       // Insert the tontine group
       const { data: tontineGroup, error: tontineError } = await supabase
         .from("tontine_groups")
@@ -100,7 +116,12 @@ const CreateGroup = () => {
         .select()
         .single();
       
-      if (tontineError) throw tontineError;
+      if (tontineError) {
+        console.error("Error creating tontine group:", tontineError);
+        throw tontineError;
+      }
+      
+      console.log("Tontine group created:", tontineGroup);
       
       // Automatically add the creator as a member with 'admin' role and 'active' status
       const { error: memberError } = await supabase
@@ -112,10 +133,15 @@ const CreateGroup = () => {
           status: "active"
         });
       
-      if (memberError) throw memberError;
+      if (memberError) {
+        console.error("Error adding creator as member:", memberError);
+        throw memberError;
+      }
       
       // Send invitations to the provided emails
       if (invitedEmails.length > 0) {
+        console.log("Sending invitations to:", invitedEmails);
+        
         const invitations = invitedEmails.map(email => ({
           group_id: tontineGroup.id,
           email,
@@ -126,7 +152,10 @@ const CreateGroup = () => {
           .from("invitations")
           .insert(invitations);
         
-        if (inviteError) throw inviteError;
+        if (inviteError) {
+          console.error("Error sending invitations:", inviteError);
+          throw inviteError;
+        }
       }
       
       toast({
@@ -148,9 +177,7 @@ const CreateGroup = () => {
     }
   };
   
-  if (loading) {
-    return <LoadingSpinner />;
-  }
+  console.log("Rendering create group form");
   
   return (
     <div className="min-h-screen bg-background flex flex-col">
@@ -378,7 +405,7 @@ const CreateGroup = () => {
                       <Button type="submit" disabled={isSubmitting}>
                         {isSubmitting ? (
                           <>
-                            <LoadingSpinner size="sm" />
+                            <LoadingSpinner className="mr-2 h-4 w-4" />
                             <span className="ml-2">Creating...</span>
                           </>
                         ) : (

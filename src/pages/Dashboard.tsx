@@ -86,7 +86,7 @@ const Dashboard = () => {
       const formattedGroups: TontineGroup[] = [];
       
       // Add member groups
-      if (memberGroups) {
+      if (memberGroups && Array.isArray(memberGroups)) {
         for (const memberGroup of memberGroups) {
           if (memberGroup.tontine_groups) {
             formattedGroups.push({
@@ -99,7 +99,7 @@ const Dashboard = () => {
       }
       
       // Add admin groups that are not already in the list
-      if (adminGroups) {
+      if (adminGroups && Array.isArray(adminGroups)) {
         for (const adminGroup of adminGroups) {
           if (!formattedGroups.some(g => g.id === adminGroup.id)) {
             formattedGroups.push({
@@ -187,7 +187,11 @@ const Dashboard = () => {
   // If user is still loading, show loading spinner
   if (authLoading) {
     console.log("Auth is still loading");
-    return <LoadingSpinner />;
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <LoadingSpinner size="lg" />
+      </div>
+    );
   }
   
   // If user is not authenticated and not loading, redirect to auth
@@ -199,7 +203,7 @@ const Dashboard = () => {
   const filteredTontines = tontineGroups?.filter(tontine => {
     if (!tontine) return false;
     
-    const matchesSearch = tontine.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+    const matchesSearch = tontine.name?.toLowerCase().includes(searchQuery.toLowerCase()) || 
                          (tontine.description && tontine.description.toLowerCase().includes(searchQuery.toLowerCase()));
     
     if (activeTab === "all") return matchesSearch;
@@ -213,7 +217,11 @@ const Dashboard = () => {
   // Show loading spinner while groups are being fetched
   if (loadingGroups) {
     console.log("Tontine groups are still loading");
-    return <LoadingSpinner />;
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <LoadingSpinner size="lg" />
+      </div>
+    );
   }
 
   console.log("Rendering dashboard with data:", { 
@@ -290,7 +298,7 @@ const Dashboard = () => {
               </TabsList>
 
               <TabsContent value="all" className="mt-0">
-                {filteredTontines.length > 0 ? (
+                {filteredTontines && filteredTontines.length > 0 ? (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     {filteredTontines.map((tontine, index) => (
                       <TontineCard 
@@ -321,7 +329,7 @@ const Dashboard = () => {
               </TabsContent>
               
               <TabsContent value="admin" className="mt-0">
-                {filteredTontines.length > 0 ? (
+                {filteredTontines && filteredTontines.length > 0 ? (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     {filteredTontines.map((tontine, index) => (
                       <TontineCard 
@@ -349,7 +357,7 @@ const Dashboard = () => {
               </TabsContent>
               
               <TabsContent value="member" className="mt-0">
-                {filteredTontines.length > 0 ? (
+                {filteredTontines && filteredTontines.length > 0 ? (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     {filteredTontines.map((tontine, index) => (
                       <TontineCard 
@@ -377,7 +385,7 @@ const Dashboard = () => {
               </TabsContent>
               
               <TabsContent value="pending" className="mt-0">
-                {filteredTontines.length > 0 ? (
+                {filteredTontines && filteredTontines.length > 0 ? (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     {filteredTontines.map((tontine, index) => (
                       <TontineCard 
